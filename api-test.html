@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>API Test Interface</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f5f5f5;
+      }
+      .container {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+      }
+      .button {
+        background: #1976d2;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin: 5px;
+      }
+      .button:hover {
+        background: #1565c0;
+      }
+      .button.success {
+        background: #4caf50;
+      }
+      .button.error {
+        background: #f44336;
+      }
+      .output {
+        background: #f0f0f0;
+        padding: 10px;
+        border-radius: 4px;
+        margin: 10px 0;
+        white-space: pre-wrap;
+        max-height: 300px;
+        overflow-y: auto;
+      }
+      .section {
+        margin: 20px 0;
+        padding: 15px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+      }
+      h2 {
+        color: #333;
+        border-bottom: 2px solid #1976d2;
+        padding-bottom: 10px;
+      }
+      .token-display {
+        background: #e3f2fd;
+        padding: 10px;
+        border-radius: 4px;
+        word-break: break-all;
+        font-family: monospace;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Teacher Scheduler API Test Interface</h1>
+
+    <div class="container">
+      <h2>Authentication</h2>
+      <div class="section">
+        <h3>Teacher Login</h3>
+        <button class="button" onclick="loginTeacher()">
+          Login as Teacher
+        </button>
+        <div
+          id="teacherToken"
+          class="token-display"
+          style="display: none"
+        ></div>
+      </div>
+
+      <div class="section">
+        <h3>Student Login</h3>
+        <button class="button" onclick="loginStudent()">
+          Login as Student
+        </button>
+        <div
+          id="studentToken"
+          class="token-display"
+          style="display: none"
+        ></div>
+      </div>
+    </div>
+
+    <div class="container">
+      <h2>Teacher Operations</h2>
+      <button class="button" onclick="createTestSchedules()">
+        Create Test Schedules
+      </button>
+      <button class="button" onclick="getSchedulesAsTeacher()">
+        Get Schedules (Teacher)
+      </button>
+      <div id="teacherOutput" class="output"></div>
+    </div>
+
+    <div class="container">
+      <h2>Student Operations</h2>
+      <button class="button" onclick="getSchedulesAsStudent()">
+        Get Schedules (Student)
+      </button>
+      <button class="button" onclick="enrollInFirstSchedule()">
+        Enroll in First Schedule
+      </button>
+      <button class="button" onclick="unenrollFromSchedule()">
+        Unenroll from Schedule
+      </button>
+      <div id="studentOutput" class="output"></div>
+    </div>
+
+    <div class="container">
+      <h2>Debug Information</h2>
+      <div id="debugOutput" class="output"></div>
+    </div>
+
+    <script>
+      let teacherToken = '';
+      let studentToken = '';
+      let currentSchedules = [];
+
+      function log(message, outputId = 'debugOutput') {
+        const output = document.getElementById(outputId);
+        const timestamp = new Date().toLocaleTimeString();
+        output.textContent += `[${timestamp}] ${message}\n`;
+        output.scrollTop = output.scrollHeight;
+      }
+
+      async function loginTeacher() {
+        try {
+          log('Attempting teacher login...', 'teacherOutput');
+
+          const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              email: 'john.doe@school.com',
+              password: 'teacher123',
+            }),
+          });
+
+          const data = await response.json();
+          log(
+            `Teacher login response: ${JSON.stringify(data, null, 2)}`,
+            'teacherOutput'
+          );
+
+          if (data.success) {
+            teacherToken = data.data.token;
+            document.getElementById(
+              'teacherToken'
+            ).textContent = `Token: ${teacherToken.substring(0, 50)}...`;
+            document.getElementById('teacherToken').style.display = 'block';
+            log('✅ Teacher login successful!', 'teacherOutput');
+          } else {
+            log(`❌ Teacher login failed: ${data.error}`, 'teacherOutput');
+          }
+        } catch (error) {
+          log(`❌ Teacher login error: ${error.message}`, 'teacherOutput');
+        }
+      }
+
+      async function loginStudent() {
+        try {
+          log('Attempting student login...', 'studentOutput');
+
+          const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              email: 'alice.johnson@student.com',
+              password: 'student123',
+            }),
+          });
+
+          const data = await response.json();
+          log(
+            `Student login response: ${JSON.stringify(data, null, 2)}`,
+            'studentOutput'
+          );
+
+          if (data.success) {
+            studentToken = data.data.token;
+            document.getElementById(
+              'studentToken'
+            ).textContent = `Token: ${studentToken.substring(0, 50)}...`;
+            document.getElementById('studentToken').style.display = 'block';
+            log('✅ Student login successful!', 'studentOutput');
+          } else {
+            log(`❌ Student login failed: ${data.error}`, 'studentOutput');
+          }
+        } catch (error) {
+          log(`❌ Student login error: ${error.message}`, 'studentOutput');
+        }
+      }
+
+      async function createTestSchedules() {
+        if (!teacherToken) {
+          log('❌ Please login as teacher first', 'teacherOutput');
+          return;
+        }
+
+        const testSchedules = [
+          {
+            subject: 'Mathematics',
+            date: '2025-09-10',
+            startTime: '09:00',
+            endTime: '10:30',
+            notes: 'Introduction to Algebra',
+            summary: 'Basic algebraic concepts and equations',
+            maxStudents: 25,
+          },
+          {
+            subject: 'Science',
+            date: '2025-09-11',
+            startTime: '11:00',
+            endTime: '12:30',
+            notes: 'Physics fundamentals',
+            summary: 'Laws of motion and energy',
+            maxStudents: 20,
+          },
+          {
+            subject: 'English',
+            date: '2025-09-12',
+            startTime: '14:00',
+            endTime: '15:30',
+            notes: 'Literature analysis',
+            summary: 'Reading comprehension and essay writing',
+            maxStudents: 30,
+          },
+        ];
+
+        log('Creating test schedules...', 'teacherOutput');
+
+        for (const schedule of testSchedules) {
+          try {
+            const response = await fetch('/api/schedules', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${teacherToken}`,
+              },
+              body: JSON.stringify(schedule),
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+              log(
+                `✅ Created ${schedule.subject} schedule (ID: ${data.data._id})`,
+                'teacherOutput'
+              );
+            } else {
+              log(
+                `❌ Failed to create ${schedule.subject} schedule: ${data.error}`,
+                'teacherOutput'
+              );
+            }
+          } catch (error) {
+            log(
+              `❌ Error creating ${schedule.subject} schedule: ${error.message}`,
+              'teacherOutput'
+            );
+          }
+        }
+
+        log('Finished creating test schedules', 'teacherOutput');
+      }
+
+      async function getSchedulesAsTeacher() {
+        if (!teacherToken) {
+          log('❌ Please login as teacher first', 'teacherOutput');
+          return;
+        }
+
+        try {
+          log('Fetching schedules as teacher...', 'teacherOutput');
+
+          const response = await fetch('/api/schedules', {
+            headers: {
+              Authorization: `Bearer ${teacherToken}`,
+            },
+          });
+
+          const data = await response.json();
+          log(
+            `Teacher schedules response: ${JSON.stringify(data, null, 2)}`,
+            'teacherOutput'
+          );
+
+          if (data.success) {
+            currentSchedules = data.data;
+            log(`✅ Retrieved ${data.data.length} schedules`, 'teacherOutput');
+
+            data.data.forEach((schedule, index) => {
+              log(
+                `  ${index + 1}. ${schedule.subject} - ${schedule.date} ${
+                  schedule.startTime
+                }-${schedule.endTime} (${schedule.enrolledStudents.length}/${
+                  schedule.maxStudents
+                } enrolled)`,
+                'teacherOutput'
+              );
+            });
+          } else {
+            log(`❌ Failed to fetch schedules: ${data.error}`, 'teacherOutput');
+          }
+        } catch (error) {
+          log(`❌ Error fetching schedules: ${error.message}`, 'teacherOutput');
+        }
+      }
+
+      async function getSchedulesAsStudent() {
+        if (!studentToken) {
+          log('❌ Please login as student first', 'studentOutput');
+          return;
+        }
+
+        try {
+          log('Fetching schedules as student...', 'studentOutput');
+
+          const response = await fetch('/api/schedules', {
+            headers: {
+              Authorization: `Bearer ${studentToken}`,
+            },
+          });
+
+          const data = await response.json();
+          log(
+            `Student schedules response: ${JSON.stringify(data, null, 2)}`,
+            'studentOutput'
+          );
+
+          if (data.success) {
+            currentSchedules = data.data;
+            log(`✅ Retrieved ${data.data.length} schedules`, 'studentOutput');
+
+            data.data.forEach((schedule, index) => {
+              log(
+                `  ${index + 1}. ${schedule.subject} - ${schedule.date} ${
+                  schedule.startTime
+                }-${schedule.endTime} (${schedule.enrolledStudents.length}/${
+                  schedule.maxStudents
+                } enrolled)`,
+                'studentOutput'
+              );
+            });
+          } else {
+            log(`❌ Failed to fetch schedules: ${data.error}`, 'studentOutput');
+          }
+        } catch (error) {
+          log(`❌ Error fetching schedules: ${error.message}`, 'studentOutput');
+        }
+      }
+
+      async function enrollInFirstSchedule() {
+        if (!studentToken) {
+          log('❌ Please login as student first', 'studentOutput');
+          return;
+        }
+
+        if (currentSchedules.length === 0) {
+          log(
+            '❌ No schedules available. Please fetch schedules first.',
+            'studentOutput'
+          );
+          return;
+        }
+
+        const firstSchedule = currentSchedules[0];
+
+        try {
+          log(`Enrolling in ${firstSchedule.subject}...`, 'studentOutput');
+
+          const response = await fetch(
+            `/api/schedules/${firstSchedule._id}/enroll`,
+            {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${studentToken}`,
+              },
+            }
+          );
+
+          const data = await response.json();
+          log(
+            `Enrollment response: ${JSON.stringify(data, null, 2)}`,
+            'studentOutput'
+          );
+
+          if (data.success) {
+            log(
+              `✅ Successfully enrolled in ${firstSchedule.subject}`,
+              'studentOutput'
+            );
+            log(
+              `   Enrolled students: ${data.data.enrolledStudents.length}/${data.data.maxStudents}`,
+              'studentOutput'
+            );
+          } else {
+            log(`❌ Failed to enroll: ${data.error}`, 'studentOutput');
+          }
+        } catch (error) {
+          log(`❌ Error enrolling: ${error.message}`, 'studentOutput');
+        }
+      }
+
+      async function unenrollFromSchedule() {
+        if (!studentToken) {
+          log('❌ Please login as student first', 'studentOutput');
+          return;
+        }
+
+        if (currentSchedules.length === 0) {
+          log(
+            '❌ No schedules available. Please fetch schedules first.',
+            'studentOutput'
+          );
+          return;
+        }
+
+        const firstSchedule = currentSchedules[0];
+
+        try {
+          log(`Unenrolling from ${firstSchedule.subject}...`, 'studentOutput');
+
+          const response = await fetch(
+            `/api/schedules/${firstSchedule._id}/unenroll`,
+            {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${studentToken}`,
+              },
+            }
+          );
+
+          const data = await response.json();
+          log(
+            `Unenrollment response: ${JSON.stringify(data, null, 2)}`,
+            'studentOutput'
+          );
+
+          if (data.success) {
+            log(
+              `✅ Successfully unenrolled from ${firstSchedule.subject}`,
+              'studentOutput'
+            );
+            log(
+              `   Enrolled students: ${data.data.enrolledStudents.length}/${data.data.maxStudents}`,
+              'studentOutput'
+            );
+          } else {
+            log(`❌ Failed to unenroll: ${data.error}`, 'studentOutput');
+          }
+        } catch (error) {
+          log(`❌ Error unenrolling: ${error.message}`, 'studentOutput');
+        }
+      }
+
+      // Initialize
+      window.onload = function () {
+        log(
+          'API Test Interface loaded. Backend should be running on http://localhost:3000'
+        );
+        log('Frontend should be running on http://localhost:4200');
+      };
+    </script>
+  </body>
+</html>

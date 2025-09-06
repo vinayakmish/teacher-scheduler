@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Schedule Management Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+        line-height: 1.6;
+      }
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+      }
+      .section {
+        margin: 20px 0;
+        padding: 20px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+      }
+      .button {
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin: 5px;
+      }
+      .button:hover {
+        background: #0056b3;
+      }
+      .output {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 4px;
+        margin: 10px 0;
+        white-space: pre-wrap;
+        max-height: 400px;
+        overflow-y: auto;
+        border: 1px solid #e9ecef;
+      }
+      .success {
+        color: #28a745;
+      }
+      .error {
+        color: #dc3545;
+      }
+      .info {
+        color: #007bff;
+      }
+      h2 {
+        color: #333;
+        border-bottom: 2px solid #007bff;
+        padding-bottom: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Teacher Scheduler - Test Interface</h1>
+
+      <div class="section">
+        <h2>Quick Test</h2>
+        <button class="button" onclick="runFullTest()">
+          Run Complete Test
+        </button>
+        <button class="button" onclick="clearOutput()">Clear Output</button>
+        <div id="output" class="output">
+          Test interface ready. Click "Run Complete Test" to start.
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Manual Actions</h2>
+        <button class="button" onclick="loginTeacher()">
+          1. Login Teacher
+        </button>
+        <button class="button" onclick="createSchedules()">
+          2. Create Schedules
+        </button>
+        <button class="button" onclick="loginStudent()">
+          3. Login Student
+        </button>
+        <button class="button" onclick="viewSchedules()">
+          4. View Schedules
+        </button>
+        <button class="button" onclick="enrollStudent()">
+          5. Enroll Student
+        </button>
+      </div>
+
+      <div class="section">
+        <h2>Application Links</h2>
+        <p>
+          <a href="http://localhost:4200" target="_blank"
+            >Frontend (http://localhost:4200)</a
+          ><br />
+          <a href="http://localhost:3000" target="_blank"
+            >Backend (http://localhost:3000)</a
+          >
+        </p>
+      </div>
+    </div>
+
+    <script>
+      let teacherToken = '';
+      let studentToken = '';
+      let schedules = [];
+      let studentId = '';
+
+      function log(message, type = 'info') {
+        const output = document.getElementById('output');
+        const timestamp = new Date().toLocaleTimeString();
+        const colorClass =
+          type === 'success' ? 'success' : type === 'error' ? 'error' : 'info';
+        output.innerHTML += `<span class="${colorClass}">[${timestamp}] ${message}</span>\n`;
+        output.scrollTop = output.scrollHeight;
+      }
+
+      function clearOutput() {
+        document.getElementById('output').innerHTML = 'Output cleared.\n';
+      }
+
+      async function makeRequest(url, options = {}) {
+        try {
+          const response = await fetch(url, {
+            headers: {
+              'Content-Type': 'application/json',
+              ...options.headers,
+            },
+            ...options,
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+
+          const data = await response.json();
+          return data;
+        } catch (error) {
+          throw new Error(`Request failed: ${error.message}`);
+        }
+      }
+
+      async function loginTeacher() {
+        try {
+          log('Logging in as teacher...', 'info');
+
+          const data = await makeRequest('/api/auth/login', {
+            method: 'POST',
+            body: JSON.stringify({
+              email: 'john.doe@school.com',
+              password: 'teacher123',
+            }),
+          });
+
+          if (data.success) {
+            teacherToken = data.data.token;
+            log('✓ Teacher login successful', 'success');
+            log(
+              `Teacher: ${data.data.user.firstName} ${data.data.user.lastName}`,
+              'info'
+            );
+            return true;
+          } else {
+            log(`✗ Teacher login failed: ${data.error}`, 'error');
+            return false;
+          }
+        } catch (error) {
+          log(`✗ Teacher login error: ${error.message}`, 'error');
+          return false;
+        }
+      }
+
+      async function createSchedules() {
+        if (!teacherToken) {
+          log('✗ Please login as teacher first', 'error');
+          return false;
+        }
+
+        const testSchedules = [
+          {
+            subject: 'Mathematics',
+            date: '2025-09-10',
+            startTime: '09:00',
+            endTime: '10:30',
+            notes: 'Introduction to Algebra',
+            summary: 'Basic algebraic concepts and equations',
+            maxStudents: 25,
+          },
+          {
+            subject: 'Science',
+            date: '2025-09-11',
+            startTime: '11:00',
+            endTime: '12:30',
+            notes: 'Physics fundamentals',
+            summary: 'Laws of motion and energy',
+            maxStudents: 20,
+          },
+          {
+            subject: 'English Literature',
+            date: '2025-09-12',
+            startTime: '14:00',
+            endTime: '15:30',
+            notes: 'Reading comprehension and analysis',
+            summary: 'Analyzing classic literature',
+            maxStudents: 30,
+          },
+        ];
+
+        log('Creating test schedules...', 'info');
+        let created = 0;
+
+        for (const schedule of testSchedules) {
+          try {
+            const data = await makeRequest('/api/schedules', {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${teacherToken}`,
+              },
+              body: JSON.stringify(schedule),
+            });
+
+            if (data.success) {
+              log(`✓ Created ${schedule.subject} schedule`, 'success');
+              created++;
+            } else {
+              log(
+                `✗ Failed to create ${schedule.subject}: ${data.error}`,
+                'error'
+              );
+            }
+          } catch (error) {
+            log(
+              `✗ Error creating ${schedule.subject}: ${error.message}`,
+              'error'
+            );
+          }
+        }
+
+        log(
+          `Created ${created}/${testSchedules.length} schedules`,
+          created > 0 ? 'success' : 'error'
+        );
+        return created > 0;
+      }
+
+      async function loginStudent() {
+        try {
+          log('Logging in as student...', 'info');
+
+          const data = await makeRequest('/api/auth/login', {
+            method: 'POST',
+            body: JSON.stringify({
+              email: 'alice.johnson@student.com',
+              password: 'student123',
+            }),
+          });
+
+          if (data.success) {
+            studentToken = data.data.token;
+            studentId = data.data.user._id;
+            log('✓ Student login successful', 'success');
+            log(
+              `Student: ${data.data.user.firstName} ${data.data.user.lastName} (ID: ${studentId})`,
+              'info'
+            );
+            return true;
+          } else {
+            log(`✗ Student login failed: ${data.error}`, 'error');
+            return false;
+          }
+        } catch (error) {
+          log(`✗ Student login error: ${error.message}`, 'error');
+          return false;
+        }
+      }
+
+      async function viewSchedules() {
+        if (!studentToken) {
+          log('✗ Please login as student first', 'error');
+          return false;
+        }
+
+        try {
+          log('Fetching schedules as student...', 'info');
+
+          const data = await makeRequest('/api/schedules', {
+            headers: {
+              Authorization: `Bearer ${studentToken}`,
+            },
+          });
+
+          if (data.success) {
+            schedules = data.data;
+            log(`✓ Found ${schedules.length} schedules`, 'success');
+
+            if (schedules.length > 0) {
+              log('Available schedules:', 'info');
+              schedules.forEach((schedule, index) => {
+                const enrolledCount = schedule.enrolledStudents
+                  ? schedule.enrolledStudents.length
+                  : 0;
+                const isEnrolled =
+                  schedule.enrolledStudents &&
+                  schedule.enrolledStudents.some(
+                    (s) => (typeof s === 'string' ? s : s._id) === studentId
+                  );
+                const status = isEnrolled ? ' [ENROLLED]' : '';
+                log(
+                  `  ${index + 1}. ${schedule.subject} - ${schedule.date} ${
+                    schedule.startTime
+                  }-${schedule.endTime} (${enrolledCount}/${
+                    schedule.maxStudents
+                  })${status}`,
+                  'info'
+                );
+              });
+            } else {
+              log('No schedules available', 'error');
+            }
+            return true;
+          } else {
+            log(`✗ Failed to fetch schedules: ${data.error}`, 'error');
+            return false;
+          }
+        } catch (error) {
+          log(`✗ Error fetching schedules: ${error.message}`, 'error');
+          return false;
+        }
+      }
+
+      async function enrollStudent() {
+        if (!studentToken || schedules.length === 0) {
+          log('✗ Please login as student and view schedules first', 'error');
+          return false;
+        }
+
+        // Find first schedule where student is not enrolled
+        const availableSchedule = schedules.find((schedule) => {
+          const isEnrolled =
+            schedule.enrolledStudents &&
+            schedule.enrolledStudents.some(
+              (s) => (typeof s === 'string' ? s : s._id) === studentId
+            );
+          const isFull =
+            (schedule.enrolledStudents
+              ? schedule.enrolledStudents.length
+              : 0) >= schedule.maxStudents;
+          return !isEnrolled && !isFull;
+        });
+
+        if (!availableSchedule) {
+          log('✗ No available schedules to enroll in', 'error');
+          return false;
+        }
+
+        try {
+          log(`Enrolling in ${availableSchedule.subject}...`, 'info');
+
+          const data = await makeRequest(
+            `/api/schedules/${availableSchedule._id}/enroll`,
+            {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${studentToken}`,
+              },
+            }
+          );
+
+          if (data.success) {
+            log(
+              `✓ Successfully enrolled in ${availableSchedule.subject}`,
+              'success'
+            );
+            log(
+              `Enrolled students: ${data.data.enrolledStudents.length}/${data.data.maxStudents}`,
+              'info'
+            );
+
+            // Refresh schedules view
+            await viewSchedules();
+            return true;
+          } else {
+            log(`✗ Failed to enroll: ${data.error}`, 'error');
+            return false;
+          }
+        } catch (error) {
+          log(`✗ Error enrolling: ${error.message}`, 'error');
+          return false;
+        }
+      }
+
+      async function runFullTest() {
+        clearOutput();
+        log('Starting complete test workflow...', 'info');
+        log('================================', 'info');
+
+        // Step 1: Login as teacher
+        if (!(await loginTeacher())) return;
+
+        // Step 2: Create schedules
+        if (!(await createSchedules())) return;
+
+        // Step 3: Login as student
+        if (!(await loginStudent())) return;
+
+        // Step 4: View schedules
+        if (!(await viewSchedules())) return;
+
+        // Step 5: Enroll student
+        if (!(await enrollStudent())) return;
+
+        log('================================', 'info');
+        log('✓ Complete test workflow finished successfully!', 'success');
+        log('You can now test the frontend at http://localhost:4200', 'info');
+      }
+
+      // Initialize
+      window.onload = function () {
+        log('Test interface loaded');
+        log('Backend: http://localhost:3000');
+        log('Frontend: http://localhost:4200');
+        log('Ready to test!', 'success');
+      };
+    </script>
+  </body>
+</html>
